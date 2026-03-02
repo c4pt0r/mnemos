@@ -20,18 +20,18 @@
 
 ## The Problem
 
-AI coding agents — Claude Code, OpenCode, OpenClaw — each maintain their own local memory files. The result:
+AI coding agents — Claude Code, OpenCode, OpenClaw, and others — often maintain separate local memory files. The result:
 
 - 🧠 **Amnesia** — Agent forgets everything when a session ends
-- 🏝️ **Silos** — Claude Code can't access what OpenClaw learned yesterday
+- 🏝️ **Silos** — One agent can't access what another learned yesterday
 - 📁 **Local files** — Memory is tied to a single machine, lost when you switch devices
 - 🚫 **No team sharing** — Your teammate's agent can't benefit from your agent's discoveries
 
-**mnemos** gives every agent a shared, cloud-persistent memory with hybrid vector + keyword search — powered by <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="18" align="center" /></a> [TiDB Cloud Serverless](https://tidbcloud.com).
+**mnemos** gives every agent a shared, cloud-persistent memory with hybrid vector + keyword search — powered by <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="24" align="center" /></a> [TiDB Cloud Serverless](https://tidbcloud.com).
 
-## Why <img src="assets/tidb-logo.png" alt="TiDB" height="22" align="center" /> TiDB Serverless?
+## Why <img src="assets/tidb-logo.png" alt="TiDB" height="32" align="center" /> TiDB Serverless?
 
-mnemos uses <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="18" align="center" /></a> [TiDB Cloud Serverless](https://tidbcloud.com) as its storage layer. Here's why:
+mnemos uses <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="24" align="center" /></a> [TiDB Cloud Serverless](https://tidbcloud.com) as its storage layer. Here’s why:
 
 | Feature | What it means for you |
 |---|---|
@@ -45,13 +45,13 @@ This architecture means your agent plugins are **truly stateless** — all state
 
 ## Supported Agents
 
-mnemos provides native plugins for major AI coding agent platforms:
+mnemos provides native plugins for major AI coding agent platforms. OpenClaw is one supported platform, not a requirement:
 
 | Platform | Plugin Type | How It Works |
 |---|---|---|
 | **Claude Code** | Hooks + Skills | Auto-loads memories on session start, auto-saves on stop via Haiku summarization |
 | **OpenCode** | Plugin SDK | `system.transform` injects memories, `session.idle` event auto-captures |
-| **OpenClaw** | Memory Plugin | Replaces built-in memory slot (`kind: "memory"`), framework manages lifecycle |
+| **OpenClaw** | Agent Memory Plugin | Replaces built-in memory slot (`kind: "memory"`), framework manages lifecycle |
 | **Any HTTP client** | REST API / SQL | `curl` to mnemo-server or TiDB HTTP Data API directly |
 
 All plugins expose the same 5 tools: `memory_store`, `memory_search`, `memory_get`, `memory_update`, `memory_delete`.
@@ -156,9 +156,9 @@ export MNEMO_API_TOKEN="mnemo_abc"
 
 A key design principle: **agent plugins carry zero state.** All memory lives in TiDB Serverless (direct mode) or mnemo-server (server mode). This means:
 
-- **OpenClaw becomes truly stateless** — deploy as many instances as you want, they all share the same memory pool via TiDB
+- **Agent plugins stay stateless** — deploy any number of agent instances freely; they all share the same memory pool via TiDB
 - **Switch machines freely** — your agent's memory follows you, not your laptop
-- **Multi-agent collaboration** — Claude Code and OpenCode share the same memories when pointed at the same database
+- **Multi-agent collaboration** — Claude Code, OpenCode, OpenClaw, and any HTTP client share the same memories when pointed at the same database
 - **No migration needed** — start with Direct mode, switch to Server mode by changing one env var
 
 ## Hybrid Search (Vector + Keyword)
@@ -294,7 +294,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 ---
 
 <p align="center">
-  <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="28" /></a>
+  <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Cloud Serverless" height="36" /></a>
   <br/>
   <sub>Built with <a href="https://tidbcloud.com">TiDB Cloud Serverless</a> — zero-ops database with native vector search.</sub>
 </p>

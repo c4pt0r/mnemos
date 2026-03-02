@@ -47,8 +47,16 @@ if [[ -z "$last_message" || ${#last_message} -lt 50 ]]; then
   exit 0
 fi
 
-# Summarize using Claude haiku (fast, cheap).
-summary=$(echo "$last_message" | claude -p --model haiku "Summarize the following assistant response into a concise memory (1-3 sentences) capturing the key decisions, facts, or actions taken. Focus on what would be useful to recall in future sessions. Output ONLY the summary, nothing else." 2>/dev/null || echo "")
+# Truncate the last message as the memory content.
+# NOTE: LLM summarization (claude -p --model haiku) was removed because it
+# causes hangs on Bedrock setups and risks recursive hook invocation.
+summary=$(echo "$last_message" | python3 -c "
+import sys
+msg = sys.stdin.read().strip()
+if len(msg) > 1000:
+    msg = msg[:1000] + '...'
+print(msg)
+" 2>/dev/null || echo "")
 
 if [[ -z "$summary" || ${#summary} -lt 10 ]]; then
   exit 0

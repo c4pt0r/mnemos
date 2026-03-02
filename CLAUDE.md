@@ -8,7 +8,7 @@ mnemos is cloud-persistent memory for AI agents. Two modes, one plugin:
 
 Three components:
 - `server/` — Go REST API (chi router, TiDB/MySQL, optional embedding)
-- `openclaw-plugin/` — TypeScript plugin for OpenClaw (direct + server backends)
+- `openclaw-plugin/` — Agent plugin for OpenClaw (direct + server backends)
 - `ccplugin/` — Claude Code plugin (bash hooks + skills, mode-aware)
 
 ## Commands

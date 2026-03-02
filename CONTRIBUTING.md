@@ -35,12 +35,14 @@ export MNEMO_API_TOKEN="mnemo_xxx"
 echo '{}' | ./ccplugin/hooks/session-start.sh
 ```
 
-### OpenClaw Plugin
+### Agent Plugins (OpenClaw)
 
 ```bash
 cd openclaw-plugin
 npm install
 ```
+
+This section is for the OpenClaw integration specifically; mnemos supports multiple agent platforms.
 
 ## Making Changes
 
@@ -53,7 +55,7 @@ npm install
 
 - **Go**: `gofmt` is the standard. No additional linters required.
 - **Shell**: Follow the patterns in `ccplugin/hooks/common.sh`. Use `set -euo pipefail`.
-- **TypeScript**: Follow existing patterns in `openclaw-plugin/`.
+- **TypeScript**: Follow existing patterns in agent plugin packages (`openclaw-plugin/`, `opencode-plugin/`).
 
 ## Architecture
 

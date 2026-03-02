@@ -67,32 +67,20 @@ mnemo_server_post() {
 
 # ─── Direct mode helpers ────────────────────────────────────────────
 
-# mnemo_sql <sql> [params_json] — Execute SQL against TiDB HTTP Data API.
-# params_json is an optional JSON array of parameter values.
+# mnemo_sql <sql> — Execute SQL against TiDB HTTP Data API.
+# The SQL must have values inline (no parameterized queries).
 mnemo_sql() {
   local sql="$1"
-  local params="${2:-null}"
   local db="${MNEMO_DB_NAME:-mnemos}"
   local url="https://http-${MNEMO_DB_HOST}/v1beta/sql"
 
   local body
-  if [[ "$params" == "null" ]]; then
-    body=$(python3 -c "
+  body=$(MNEMO_DB="$db" MNEMO_Q="$sql" python3 -c "
 import json, os
 print(json.dumps({'database': os.environ['MNEMO_DB'], 'query': os.environ['MNEMO_Q']}))
 " 2>/dev/null) || return 1
-  else
-    body=$(MNEMO_PARAMS="$params" python3 -c "
-import json, os
-print(json.dumps({
-    'database': os.environ['MNEMO_DB'],
-    'query': os.environ['MNEMO_Q'],
-    'params': json.loads(os.environ['MNEMO_PARAMS'])
-}))
-" 2>/dev/null) || return 1
-  fi
 
-  MNEMO_DB="$db" MNEMO_Q="$sql" curl -sf --max-time 10 \
+  curl -sf --max-time 10 \
     -u "${MNEMO_DB_USER}:${MNEMO_DB_PASS}" \
     -H "Content-Type: application/json" \
     -d "$body" \
@@ -102,7 +90,7 @@ print(json.dumps({
 # mnemo_direct_init — Auto-create table if not exists (direct mode).
 mnemo_direct_init() {
   local dims="${MNEMO_EMBED_DIMS:-1536}"
-  mnemo_sql "CREATE TABLE IF NOT EXISTS memories (
+  mnemo_sql "CREATE TABLE IF NOT EXISTS ${MNEMO_DB_NAME:-mnemos}.memories (
     id          VARCHAR(36)       PRIMARY KEY,
     space_id    VARCHAR(36)       NOT NULL,
     content     TEXT              NOT NULL,
@@ -135,7 +123,7 @@ mnemo_get_memories() {
   elif [[ "$mode" == "direct" ]]; then
     mnemo_direct_init
     local result
-    result=$(mnemo_sql "SELECT id, content, key_name, source, tags, version, updated_by, created_at, updated_at FROM memories WHERE space_id = '${MNEMO_SPACE_ID}' ORDER BY updated_at DESC LIMIT ${limit}" 2>/dev/null || echo "")
+    result=$(mnemo_sql "SELECT id, content, key_name, source, tags, version, updated_by, created_at, updated_at FROM ${MNEMO_DB_NAME:-mnemos}.memories WHERE space_id = '${MNEMO_SPACE_ID}' ORDER BY updated_at DESC LIMIT ${limit}" 2>/dev/null || echo "")
     if [[ -z "$result" ]]; then
       echo '{"memories":[],"total":0}'
       return
@@ -146,7 +134,7 @@ import json, sys
 try:
     data = json.load(sys.stdin)
     rows = data.get('rows', [])
-    cols = [c['name'] for c in data.get('columns', [])]
+    cols = [c['name'] for c in data.get('types', data.get('columns', []))]
     memories = []
     for row in rows:
         m = dict(zip(cols, row))
@@ -175,32 +163,41 @@ mnemo_post_memory() {
     mnemo_server_post "/api/memories" "$body"
   elif [[ "$mode" == "direct" ]]; then
     mnemo_direct_init
-    # Parse the body and insert directly.
-    MNEMO_BODY="$body" python3 -c "
-import json, os, uuid, sys
+    # Parse body, build SQL with inline values (API has no param support), then insert.
+    local insert_result
+    insert_result=$(MNEMO_BODY="$body" MNEMO_SID="${MNEMO_SPACE_ID}" MNEMO_DB="${MNEMO_DB_NAME:-mnemos}" python3 << 'PYEOF'
+import json, os, uuid
+
+def sql_escape(val):
+    if val is None:
+        return 'NULL'
+    s = str(val).replace("'", "''")
+    return "'" + s + "'"
 
 body = json.loads(os.environ['MNEMO_BODY'])
 mid = str(uuid.uuid4())
+sid = os.environ['MNEMO_SID']
 content = body.get('content', '')
-key = body.get('key', None)
-source = body.get('source', None)
+key = body.get('key')
+source = body.get('source')
 tags = json.dumps(body.get('tags', []))
 metadata = json.dumps(body.get('metadata')) if body.get('metadata') else None
 
-# Build INSERT SQL
-sql = 'INSERT INTO memories (id, space_id, content, key_name, source, tags, metadata, version, updated_by) VALUES (%s, %s, %s, %s, %s, %s, %s, 1, %s)'
-params = [mid, '${MNEMO_SPACE_ID}', content, key, source, tags, metadata, source]
+db = os.environ.get('MNEMO_DB', 'mnemos')
+sql = 'INSERT INTO {}.memories (id, space_id, content, key_name, source, tags, metadata, version, updated_by) VALUES ({}, {}, {}, {}, {}, {}, {}, 1, {})'.format(
+    db, sql_escape(mid), sql_escape(sid), sql_escape(content),
+    sql_escape(key), sql_escape(source), sql_escape(tags),
+    sql_escape(metadata), sql_escape(source))
 
-print(json.dumps({'query': sql, 'params': params, 'id': mid}))
-" 2>/dev/null | {
-      read -r insert_info
-      local sql params mid
-      sql=$(echo "$insert_info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['query'])")
-      params=$(echo "$insert_info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d['params']))")
-      mid=$(echo "$insert_info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['id'])")
-      mnemo_sql "$sql" "$params" >/dev/null 2>&1
-      echo "{\"id\":\"${mid}\"}"
-    }
+print(json.dumps({'sql': sql, 'id': mid}))
+PYEOF
+    ) || { echo '{"error":"failed to build SQL"}'; return 1; }
+
+    local sql mid
+    sql=$(echo "$insert_result" | python3 -c "import json,sys; print(json.load(sys.stdin)['sql'])")
+    mid=$(echo "$insert_result" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+    mnemo_sql "$sql" >/dev/null 2>&1
+    echo "{\"id\":\"${mid}\"}"
   fi
 }
 
@@ -219,7 +216,7 @@ mnemo_search() {
   elif [[ "$mode" == "direct" ]]; then
     mnemo_direct_init
     local result
-    result=$(mnemo_sql "SELECT id, content, key_name, source, tags, version, updated_by, created_at, updated_at FROM memories WHERE space_id = '${MNEMO_SPACE_ID}' AND content LIKE CONCAT('%', '${query}', '%') ORDER BY updated_at DESC LIMIT ${limit}" 2>/dev/null || echo "")
+    result=$(mnemo_sql "SELECT id, content, key_name, source, tags, version, updated_by, created_at, updated_at FROM ${MNEMO_DB_NAME:-mnemos}.memories WHERE space_id = '${MNEMO_SPACE_ID}' AND content LIKE CONCAT('%', '${query}', '%') ORDER BY updated_at DESC LIMIT ${limit}" 2>/dev/null || echo "")
     if [[ -z "$result" ]]; then
       echo '{"memories":[],"total":0}'
       return
@@ -229,7 +226,7 @@ import json, sys
 try:
     data = json.load(sys.stdin)
     rows = data.get('rows', [])
-    cols = [c['name'] for c in data.get('columns', [])]
+    cols = [c['name'] for c in data.get('types', data.get('columns', []))]
     memories = []
     for row in rows:
         m = dict(zip(cols, row))
@@ -249,6 +246,12 @@ except Exception:
 }
 
 # read_stdin — Read stdin (hook input JSON) into $HOOK_INPUT.
+# Uses read with timeout to avoid hanging if stdin is not provided.
 read_stdin() {
-  HOOK_INPUT="$(cat)"
+  local input=""
+  if read -t 2 -r input 2>/dev/null; then
+    HOOK_INPUT="$input"
+  else
+    HOOK_INPUT="{}"
+  fi
 }

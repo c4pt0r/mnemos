@@ -54,7 +54,7 @@ curl -sf -H "Authorization: Bearer $MNEMO_API_TOKEN" \
 
 # Server mode — filter by source agent
 curl -sf -H "Authorization: Bearer $MNEMO_API_TOKEN" \
-  "$MNEMO_API_URL/api/memories?source=sj-openclaw&limit=10"
+  "$MNEMO_API_URL/api/memories?source=claude-code&limit=10"
 ```
 
 3. **Evaluate**: Read through the results. Skip memories that are:
