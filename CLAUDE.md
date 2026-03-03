@@ -81,7 +81,8 @@ claude-plugin/skills/memory-store/       — On-demand save skill
 - Version increment is atomic in SQL: `SET version = version + 1`
 - Tags stored as JSON column, filtered with `JSON_CONTAINS`; empty tags stored as `[]` (not NULL)
 - `POST /api/spaces` has no auth — bootstrap endpoint
-- Direct mode uses `space_id = "default"` for schema compatibility with server mode
+- Direct mode uses `space_id = "default"` (single-tenant, no isolation needed)
+- **Direct/server schemas are intentionally independent**: direct-mode schema (`openclaw-plugin/schema.ts`, `opencode-plugin/src/direct-backend.ts`, `claude-plugin/hooks/common.sh`) carries only columns direct-mode actually uses. Server-mode schema (`server/schema.sql`) carries CRDT columns because the Go server needs them. The two schemas evolve independently — no compatibility obligation. Pointing a direct-mode plugin at a server-mode database is not a supported path.
 
 ## Server mode: token bootstrap
 

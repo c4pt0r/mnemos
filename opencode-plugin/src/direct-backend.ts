@@ -95,6 +95,13 @@ export class DirectBackend implements MemoryBackend {
         INDEX idx_source        (space_id, source),
         INDEX idx_updated       (space_id, updated_at)
       )`);
+      try {
+        await this.sql(
+          `ALTER TABLE memories ADD VECTOR INDEX idx_cosine ((VEC_COSINE_DISTANCE(embedding)))`
+        );
+      } catch {
+        // Already exists or TiFlash unavailable — no-op.
+      }
     } catch {
       // Table may already exist — continue.
     }
