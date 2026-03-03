@@ -1,4 +1,4 @@
-.PHONY: build vet clean run
+.PHONY: build vet clean run check-schema
 
 build:
 	cd server && go build -o mnemo-server ./cmd/mnemo-server
@@ -14,3 +14,6 @@ run: build
 
 docker:
 	docker build -t mnemo-server ./server
+
+check-schema:
+	@scripts/check-schema.sh

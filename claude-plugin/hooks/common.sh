@@ -108,6 +108,7 @@ mnemo_direct_init() {
     INDEX idx_source        (space_id, source),
     INDEX idx_updated       (space_id, updated_at)
   )" >/dev/null 2>&1 || true
+  mnemo_sql "ALTER TABLE ${MNEMO_DB_NAME:-mnemos}.memories ADD VECTOR INDEX idx_cosine ((VEC_COSINE_DISTANCE(embedding)))" >/dev/null 2>&1 || true
 }
 
 # ─── Mode-agnostic helpers ──────────────────────────────────────────
