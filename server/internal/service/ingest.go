@@ -589,7 +589,7 @@ func (s *IngestService) gatherExistingMemories(ctx context.Context, agentID stri
 				seen[m.ID] = struct{}{}
 				m.Content = truncateRunes(m.Content, contentMaxLen)
 				result = append(result, m)
-		}
+			}
 		}
 		if len(result) > maxExistingMemories {
 			slog.Warn("gatherExistingMemories: truncating no-vector results", "count", len(result), "max", maxExistingMemories)
