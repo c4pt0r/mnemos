@@ -431,10 +431,11 @@ Return ONLY valid JSON. No markdown fences.
 
 {
   "memory": [
-    {"id": 0, "text": "...", "event": "NOOP"},
-    {"id": 1, "text": "updated text", "event": "UPDATE", "old_memory": "original text"},
-    {"id": 2, "text": "...", "event": "DELETE"},
+    {"id": "0", "text": "...", "event": "NOOP"},
+    {"id": "1", "text": "updated text", "event": "UPDATE", "old_memory": "original text"},
+    {"id": "2", "text": "...", "event": "DELETE"},
     {"id": "new", "text": "brand new fact", "event": "ADD"}
+  ]
 }`
 
 	userPrompt := fmt.Sprintf(`Current memory contents:
