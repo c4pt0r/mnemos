@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
 
+	"github.com/qiffang/mnemos/server/internal/db9zero"
 	"github.com/qiffang/mnemos/server/internal/domain"
 	"github.com/qiffang/mnemos/server/internal/repository"
 	"github.com/qiffang/mnemos/server/internal/tenant"
@@ -39,6 +43,7 @@ const (
 type TenantService struct {
 	tenants repository.TenantRepo
 	zero    *tenant.ZeroClient
+	db9     *db9zero.Client
 	pool    *tenant.TenantPool
 	logger  *slog.Logger
 }
@@ -46,10 +51,11 @@ type TenantService struct {
 func NewTenantService(
 	tenants repository.TenantRepo,
 	zero *tenant.ZeroClient,
+	db9Client *db9zero.Client,
 	pool *tenant.TenantPool,
 	logger *slog.Logger,
 ) *TenantService {
-	return &TenantService{tenants: tenants, zero: zero, pool: pool, logger: logger}
+	return &TenantService{tenants: tenants, zero: zero, db9: db9Client, pool: pool, logger: logger}
 }
 
 // ProvisionResult is the output of Provision.
@@ -58,24 +64,161 @@ type ProvisionResult struct {
 	ClaimURL string `json:"claim_url,omitempty"`
 }
 
-// Provision creates a new TiDB Zero instance and registers it as a tenant.
-// The TiDB Zero instance ID is used as the tenant ID.
+// Provision creates a new database instance and registers it as a tenant.
+// Supports both TiDB Zero and db9 backends.
 func (s *TenantService) Provision(ctx context.Context) (*ProvisionResult, error) {
-	if s.zero == nil {
-		return nil, &domain.ValidationError{Message: "provisioning disabled (TiDB Zero not configured)"}
+	// Try db9 first if configured
+	if s.db9 != nil {
+		return s.provisionDB9(ctx)
 	}
 
+	// Fall back to TiDB Zero
+	if s.zero != nil {
+		return s.provisionTiDBZero(ctx)
+	}
+
+	return nil, &domain.ValidationError{Message: "provisioning disabled (no backend configured)"}
+}
+
+// provisionDB9 creates a new db9 database instance.
+func (s *TenantService) provisionDB9(ctx context.Context) (*ProvisionResult, error) {
+	// Generate a unique database name
+	randomBytes := make([]byte, 4)
+	rand.Read(randomBytes)
+	dbName := fmt.Sprintf("mem9s-%s", hex.EncodeToString(randomBytes))
+
+	db, err := s.db9.CreateDatabase(ctx, dbName)
+	if err != nil {
+		return nil, fmt.Errorf("provision db9 database: %w", err)
+	}
+
+	// Parse connection string to extract host, port, user, password
+	// Format: postgresql://dbid.admin:password@pg.db9.io:5433/postgres
+	host, port, user, password := parseDB9ConnectionString(db.ConnectionString)
+
+	t := &domain.Tenant{
+		ID:            db.ID,
+		Name:          dbName,
+		DBHost:        host,
+		DBPort:        port,
+		DBUser:        user,
+		DBPassword:    password,
+		DBName:        "postgres",
+		DBTLS:         true,
+		Provider:      "db9",
+		ClusterID:     db.ID,
+		ClaimURL:      "", // db9 databases are claimed server-side
+		Status:        domain.TenantProvisioning,
+		SchemaVersion: 0,
+	}
+	if err := s.tenants.Create(ctx, t); err != nil {
+		return nil, fmt.Errorf("create tenant record: %w", err)
+	}
+
+	// Initialize schema via db9 SQL API
+	if err := s.initDB9Schema(ctx, db.ID); err != nil {
+		if s.logger != nil {
+			s.logger.Error("tenant schema init failed", "tenant_id", db.ID, "err", err)
+		}
+		return nil, fmt.Errorf("init tenant schema: %w", err)
+	}
+
+	if err := s.tenants.UpdateStatus(ctx, db.ID, domain.TenantActive); err != nil {
+		return nil, fmt.Errorf("activate tenant: %w", err)
+	}
+	if err := s.tenants.UpdateSchemaVersion(ctx, db.ID, 1); err != nil {
+		return nil, fmt.Errorf("update schema version: %w", err)
+	}
+
+	return &ProvisionResult{
+		ID:       db.ID,
+		ClaimURL: "", // No claim needed for db9
+	}, nil
+}
+
+// initDB9Schema initializes the memory table schema via db9 SQL API.
+func (s *TenantService) initDB9Schema(ctx context.Context, dbID string) error {
+	schema := `CREATE TABLE IF NOT EXISTS memories (
+		id              TEXT            PRIMARY KEY,
+		content         TEXT            NOT NULL,
+		source          TEXT,
+		tags            JSONB,
+		metadata        JSONB,
+		embedding       VECTOR(768),
+		memory_type     TEXT            NOT NULL DEFAULT 'pinned',
+		agent_id        TEXT,
+		session_id      TEXT,
+		state           TEXT            NOT NULL DEFAULT 'active',
+		version         INT             DEFAULT 1,
+		updated_by      TEXT,
+		superseded_by   TEXT,
+		created_at      TIMESTAMPTZ     DEFAULT NOW(),
+		updated_at      TIMESTAMPTZ     DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_memory_type ON memories(memory_type);
+	CREATE INDEX IF NOT EXISTS idx_source ON memories(source);
+	CREATE INDEX IF NOT EXISTS idx_state ON memories(state);
+	CREATE INDEX IF NOT EXISTS idx_agent ON memories(agent_id);
+	CREATE INDEX IF NOT EXISTS idx_session ON memories(session_id);
+	CREATE INDEX IF NOT EXISTS idx_updated ON memories(updated_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_tags ON memories USING GIN(tags);`
+
+	return s.db9.ExecuteSQL(ctx, dbID, schema)
+}
+
+// parseDB9ConnectionString extracts components from a db9 connection string.
+// Format: postgresql://dbid.admin:password@pg.db9.io:5433/postgres
+func parseDB9ConnectionString(connStr string) (host string, port int, user, password string) {
+	// Default values
+	host = "pg.db9.io"
+	port = 5433
+	user = "admin"
+	password = ""
+
+	// Remove protocol prefix
+	connStr = strings.TrimPrefix(connStr, "postgresql://")
+	connStr = strings.TrimPrefix(connStr, "postgres://")
+
+	// Split user:pass@host:port/db
+	if atIdx := strings.Index(connStr, "@"); atIdx > 0 {
+		userPass := connStr[:atIdx]
+		hostPart := connStr[atIdx+1:]
+
+		// Parse user:password
+		if colonIdx := strings.Index(userPass, ":"); colonIdx > 0 {
+			user = userPass[:colonIdx]
+			password = userPass[colonIdx+1:]
+		} else {
+			user = userPass
+		}
+
+		// Parse host:port/db
+		if slashIdx := strings.Index(hostPart, "/"); slashIdx > 0 {
+			hostPort := hostPart[:slashIdx]
+			if colonIdx := strings.LastIndex(hostPort, ":"); colonIdx > 0 {
+				host = hostPort[:colonIdx]
+				fmt.Sscanf(hostPort[colonIdx+1:], "%d", &port)
+			} else {
+				host = hostPort
+			}
+		}
+	}
+
+	return host, port, user, password
+}
+
+// provisionTiDBZero creates a new TiDB Zero instance.
+func (s *TenantService) provisionTiDBZero(ctx context.Context) (*ProvisionResult, error) {
 	instance, err := s.zero.CreateInstance(ctx, "mem9s")
 	if err != nil {
 		return nil, fmt.Errorf("provision TiDB Zero instance: %w", err)
 	}
 
-	// Use the TiDB Zero instance ID as the tenant ID.
 	tenantID := instance.ID
 
 	t := &domain.Tenant{
 		ID:            tenantID,
-		Name:          tenantID, // Use ID as name for auto-provisioned tenants.
+		Name:          tenantID,
 		DBHost:        instance.Host,
 		DBPort:        instance.Port,
 		DBUser:        instance.Username,

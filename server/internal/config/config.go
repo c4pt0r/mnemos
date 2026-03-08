@@ -34,6 +34,8 @@ type Config struct {
 
 	TiDBZeroEnabled       bool
 	TiDBZeroAPIURL        string
+	DB9APIKey             string
+	DB9APIURL             string
 	TenantPoolMaxIdle     int
 	TenantPoolMaxOpen     int
 	TenantPoolIdleTimeout time.Duration
@@ -65,6 +67,8 @@ func Load() (*Config, error) {
 		IngestMode:            envOr("MNEMO_INGEST_MODE", "smart"),
 		TiDBZeroEnabled:       envBool("MNEMO_TIDB_ZERO_ENABLED", true),
 		TiDBZeroAPIURL:        envOr("MNEMO_TIDB_ZERO_API_URL", "https://zero.tidbapi.com/v1alpha1"),
+		DB9APIKey:             os.Getenv("DB9_API_KEY"),
+		DB9APIURL:             envOr("DB9_API_URL", "https://db9.ai/api"),
 		TenantPoolMaxIdle:     envInt("MNEMO_TENANT_POOL_MAX_IDLE", 5),
 		TenantPoolMaxOpen:     envInt("MNEMO_TENANT_POOL_MAX_OPEN", 10),
 		TenantPoolIdleTimeout: envDuration("MNEMO_TENANT_POOL_IDLE_TIMEOUT", 10*time.Minute),
