@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="assets/logo.png" alt="mnemos" width="180" />
-</p>
-
-<h1 align="center">mnemos</h1>
+<h1 align="center">mnemos-db9</h1>
 
 <p align="center">
   <strong>Persistent Memory for AI Agents.</strong><br/>
