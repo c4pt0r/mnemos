@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/qiffang/mnemos/server/internal/config"
+	"github.com/qiffang/mnemos/server/internal/db9zero"
 	"github.com/qiffang/mnemos/server/internal/embed"
 	"github.com/qiffang/mnemos/server/internal/handler"
 	"github.com/qiffang/mnemos/server/internal/llm"
@@ -96,10 +97,18 @@ func main() {
 
 	// Services.
 	var zeroClient *tenant.ZeroClient
-	if cfg.TiDBZeroEnabled && cfg.DBType != "db9" {
+	var db9Client *db9zero.Client
+
+	if cfg.DBType == "db9" && cfg.DB9APIKey != "" {
+		db9Client = db9zero.NewClient(db9zero.Config{
+			BaseURL: cfg.DB9APIURL,
+			APIKey:  cfg.DB9APIKey,
+		})
+		logger.Info("db9 provisioning enabled", "api_url", cfg.DB9APIURL)
+	} else if cfg.TiDBZeroEnabled && cfg.DBType != "db9" {
 		zeroClient = tenant.NewZeroClient(cfg.TiDBZeroAPIURL)
 	}
-	tenantSvc := service.NewTenantService(tenantRepo, zeroClient, tenantPool, logger)
+	tenantSvc := service.NewTenantService(tenantRepo, zeroClient, db9Client, tenantPool, logger)
 
 	// Middleware.
 	tenantMW := middleware.ResolveTenant(tenantRepo, tenantPool)

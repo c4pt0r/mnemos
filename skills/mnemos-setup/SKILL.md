@@ -15,12 +15,12 @@ description: |
 
 You need a mnemo-server instance. Options:
 
-1. **Hosted (recommended):** Use `https://mem.db9.ai` — no setup required
+1. **Hosted (recommended):** Use `https://mem-api.db9.ai` — no setup required
 2. **Self-hosted:** Deploy your own server (see below)
 
-## Option A: Use Hosted Server (mem.db9.ai)
+## Option A: Use Hosted Server (mem-api.db9.ai)
 
-Skip to **Step 2** and use `https://mem.db9.ai` as your `apiUrl`.
+Skip to **Step 2** and use `https://mem-api.db9.ai` as your `apiUrl`.
 
 ## Option B: Self-hosted — Deploy mnemo-server
 
@@ -56,7 +56,7 @@ Add to `openclaw.json`:
       "mnemo": {
         "enabled": true,
         "config": {
-          "apiUrl": "https://mem.db9.ai",
+          "apiUrl": "https://mem-api.db9.ai",
           "tenantID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
         }
       }
@@ -77,7 +77,7 @@ Restart OpenClaw. You should see:
 Set environment variables (add to shell profile or `.env`):
 
 ```bash
-export MNEMO_API_URL="https://mem.db9.ai"
+export MNEMO_API_URL="https://mem-api.db9.ai"
 export MNEMO_TENANT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
@@ -102,7 +102,7 @@ Add to `~/.claude/settings.json`:
 ```json
 {
   "env": {
-    "MNEMO_API_URL": "https://mem.db9.ai",
+    "MNEMO_API_URL": "https://mem-api.db9.ai",
     "MNEMO_TENANT_ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }

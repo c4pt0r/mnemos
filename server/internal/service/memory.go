@@ -300,12 +300,8 @@ func (s *MemoryService) Update(ctx context.Context, agentName, id, content strin
 	}
 
 	if ifMatch > 0 && ifMatch != current.Version {
-		slog.Warn("version conflict, applying LWW",
-			"memory_id", id,
-			"expected_version", ifMatch,
-			"actual_version", current.Version,
-			"agent", agentName,
-		)
+		// Strict version check: reject update if version mismatch
+		return nil, domain.ErrWriteConflict
 	}
 
 	contentChanged := false
