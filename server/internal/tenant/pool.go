@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 type TenantPool struct {
@@ -95,7 +98,13 @@ func (p *TenantPool) Get(ctx context.Context, tenantID string, dsn string) (*sql
 		return nil, fmt.Errorf("tenant pool: total limit %d reached", p.totalLimit)
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	// Auto-detect driver from DSN format
+	driver := "mysql"
+	if strings.HasPrefix(dsn, "postgresql://") || strings.HasPrefix(dsn, "postgres://") {
+		driver = "postgres"
+	}
+
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
 	}

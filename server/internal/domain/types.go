@@ -105,8 +105,19 @@ type Tenant struct {
 	DeletedAt     *time.Time   `json:"-"`
 }
 
-// DSN builds a MySQL connection string for this tenant's database.
+// DSN builds a connection string for this tenant's database.
+// Supports both MySQL (TiDB) and PostgreSQL (db9) formats based on Provider.
 func (t *Tenant) DSN() string {
+	if t.Provider == "db9" {
+		// PostgreSQL format for db9
+		sslmode := "disable"
+		if t.DBTLS {
+			sslmode = "require"
+		}
+		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+			t.DBUser, t.DBPassword, t.DBHost, t.DBPort, t.DBName, sslmode)
+	}
+	// MySQL format for TiDB
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
 		t.DBUser, t.DBPassword, t.DBHost, t.DBPort, t.DBName)
 	if t.DBTLS {

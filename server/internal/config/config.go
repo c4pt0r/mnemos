@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port      string
 	DSN       string
+	DBType    string // "tidb" or "db9"
 	RateLimit float64
 	RateBurst int
 
@@ -48,6 +49,7 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Port:                  envOr("MNEMO_PORT", "8080"),
 		DSN:                   dsn,
+		DBType:                envOr("MNEMO_DB_TYPE", "tidb"),
 		RateLimit:             envFloat("MNEMO_RATE_LIMIT", 100),
 		RateBurst:             envInt("MNEMO_RATE_BURST", 200),
 		EmbedAutoModel:        os.Getenv("MNEMO_EMBED_AUTO_MODEL"),

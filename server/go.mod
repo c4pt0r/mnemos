@@ -6,6 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-sql-driver/mysql v1.9.0
 	github.com/google/uuid v1.6.0
+	github.com/lib/pq v1.11.2
 	golang.org/x/time v0.9.0
 )
 
