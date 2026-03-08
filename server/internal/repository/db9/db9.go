@@ -61,11 +61,13 @@ func InitSchema(db *sql.DB) error {
 	}
 
 	// Create indexes
+	// Note: HNSW index requires INTEGER/BIGINT primary key, which we don't have (TEXT UUID).
+	// Vector search still works via sequential scan with <=> operator.
+	// For production workloads with large datasets, consider using IVFFlat index instead.
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_memories_state ON memories(state)`,
 		`CREATE INDEX IF NOT EXISTS idx_memories_updated_at ON memories(updated_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_memories_tags ON memories USING gin(tags)`,
-		`CREATE INDEX IF NOT EXISTS idx_memories_embedding ON memories USING hnsw(embedding vector_cosine_ops)`,
 	}
 	for _, idx := range indexes {
 		if _, err := db.ExecContext(ctx, idx); err != nil {
