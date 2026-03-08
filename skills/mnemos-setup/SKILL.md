@@ -13,9 +13,16 @@ description: |
 
 ## Prerequisites
 
-You need a running mnemo-server instance. See the [server README](https://github.com/qiffang/mnemos/tree/main/server) for deployment instructions.
+You need a mnemo-server instance. Options:
 
-## Step 1: Deploy mnemo-server
+1. **Hosted (recommended):** Use `https://mem.db9.ai` — no setup required
+2. **Self-hosted:** Deploy your own server (see below)
+
+## Option A: Use Hosted Server (mem.db9.ai)
+
+Skip to **Step 2** and use `https://mem.db9.ai` as your `apiUrl`.
+
+## Option B: Self-hosted — Deploy mnemo-server
 
 ```bash
 cd mnemos/server
@@ -49,7 +56,7 @@ Add to `openclaw.json`:
       "mnemo": {
         "enabled": true,
         "config": {
-          "apiUrl": "http://localhost:8080",
+          "apiUrl": "https://mem.db9.ai",
           "tenantID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
         }
       }
@@ -70,7 +77,7 @@ Restart OpenClaw. You should see:
 Set environment variables (add to shell profile or `.env`):
 
 ```bash
-export MNEMO_API_URL="http://localhost:8080"
+export MNEMO_API_URL="https://mem.db9.ai"
 export MNEMO_TENANT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
@@ -95,7 +102,7 @@ Add to `~/.claude/settings.json`:
 ```json
 {
   "env": {
-    "MNEMO_API_URL": "http://localhost:8080",
+    "MNEMO_API_URL": "https://mem.db9.ai",
     "MNEMO_TENANT_ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
