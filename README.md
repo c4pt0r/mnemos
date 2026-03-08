@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://tidbcloud.com"><img src="https://img.shields.io/badge/Powered%20by-TiDB%20Starter-E60C0C?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cGF0aCBkPSJNMTEuOTk4NCAxLjk5OTAyTDMuNzE4NzUgNy40OTkwMkwzLjcxODc1IDE3TDExLjk5NjQgMjIuNUwyMC4yODE0IDE3VjcuNDk5MDJMMTEuOTk4NCAxLjk5OTAyWiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=" alt="Powered by TiDB Starter"></a>
+  <a href="https://db9.ai"><img src="https://img.shields.io/badge/Powered%20by-db9-4A90E2?style=flat" alt="Powered by db9"></a>
   <a href="https://goreportcard.com/report/github.com/qiffang/mnemos/server"><img src="https://goreportcard.com/badge/github.com/qiffang/mnemos/server" alt="Go Report Card"></a>
   <a href="https://github.com/qiffang/mnemos/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
   <a href="https://github.com/qiffang/mnemos"><img src="https://img.shields.io/github/stars/qiffang/mnemos?style=social" alt="Stars"></a>
@@ -20,11 +20,28 @@
 
 ## 🚀 Quick Start
 
-**Server-based memory via mnemo-server.**
+### Option A: Hosted (Recommended)
+
+Use the hosted service at `https://mem.db9.ai` — no server setup required.
 
 ```bash
-# 1. Deploy mnemo-server
-cd server && MNEMO_DSN="user:pass@tcp(host:4000)/mnemos?parseTime=true" go run ./cmd/mnemo-server
+# 1. Provision a tenant
+curl -s -X POST https://mem.db9.ai/v1alpha1/mem9s
+# → {"id":"...", "claim_url":"..."}
+
+# 2. Configure your agent
+export MNEMO_API_URL="https://mem.db9.ai"
+export MNEMO_TENANT_ID="..."
+```
+
+### Option B: Self-Hosted
+
+```bash
+# 1. Deploy mnemo-server with db9
+cd server
+export MNEMO_DSN="postgresql://user:pass@pg.db9.io:5433/postgres"
+export MNEMO_DB_TYPE="db9"
+go run ./cmd/mnemo-server
 ```
 
 **2. Install plugin for your agent (pick one):**
@@ -34,15 +51,6 @@ cd server && MNEMO_DSN="user:pass@tcp(host:4000)/mnemos?parseTime=true" go run .
 | **Claude Code** | `/plugin marketplace add qiffang/mnemos` then `/plugin install mnemo-memory@mnemos` |
 | **OpenCode** | Add `"plugin": ["mnemo-opencode"]` to `opencode.json` |
 | **OpenClaw** | Add `mnemo` to `openclaw.json` plugins (see [openclaw-plugin/README](openclaw-plugin/README.md)) |
-
-```bash
-# 3. Provision a tenant and set credentials
-curl -s -X POST localhost:8080/v1alpha1/mem9s
-# → {"id":"...", "claim_url":"..."}
-
-export MNEMO_API_URL="http://localhost:8080"
-export MNEMO_TENANT_ID="..."
-```
 
 All agents pointing at the same tenant ID share one memory pool.
 
@@ -57,22 +65,23 @@ AI coding agents — Claude Code, OpenCode, OpenClaw, and others — often maint
 - 📁 **Local files** — Memory is tied to a single machine, lost when you switch devices
 - 🚫 **No team sharing** — Your teammate's agent can't benefit from your agent's discoveries
 
-**mnemos** gives every agent a shared, cloud-persistent memory with hybrid vector + keyword search — powered by [TiDB Starter](https://tidbcloud.com).
+**mnemos** gives every agent a shared, cloud-persistent memory with hybrid vector + keyword search — powered by [db9](https://db9.ai).
 
-## Why TiDB Starter?
+## Why db9?
 
-mnemos uses [TiDB Starter](https://tidbcloud.com) (formerly TiDB Serverless) as the backing store for mnemo-server:
+mnemos uses [db9](https://db9.ai) as the backing store for mnemo-server:
 
 | Feature | What it means for you |
 |---|---|
-| **Free tier** | 25 GiB storage, 250M Request Units/month — enough for most individual and small team use |
-| **TiDB Cloud Zero** | Instant database provisioning via API — no signup required for first 30 days |
+| **Free tier** | Generous free quota for individual and small team use |
+| **PostgreSQL compatible** | Use familiar SQL, tools, and drivers |
 | **Native VECTOR type** | Hybrid search (vector + keyword) without a separate vector database |
-| **Auto-embedding (`EMBED_TEXT`)** | TiDB generates embeddings server-side — no OpenAI key needed for semantic search |
-| **Zero ops** | No servers to manage, no scaling to worry about, automatic backups |
-| **MySQL compatible** | Migrate to self-hosted TiDB or MySQL anytime |
+| **Chinese FTS (jieba)** | Full-text search with Chinese tokenization out of the box |
+| **JSONB support** | Flexible metadata and tag storage |
+| **Zero ops** | No servers to manage, no scaling to worry about |
+| **fs9 extension** | Import CSV/Parquet files directly via SQL |
 
-This architecture keeps agent plugins **stateless** — all state lives in mnemo-server, backed by TiDB.
+This architecture keeps agent plugins **stateless** — all state lives in mnemo-server, backed by db9.
 
 ## Supported Agents
 
@@ -91,7 +100,7 @@ All plugins expose the same 5 tools: `memory_store`, `memory_search`, `memory_ge
 
 ## Stateless Agents, Cloud Memory
 
-A key design principle: **agent plugins carry zero state.** All memory lives in mnemo-server, backed by TiDB/MySQL. This means:
+A key design principle: **agent plugins carry zero state.** All memory lives in mnemo-server, backed by db9. This means:
 
 - **Agent plugins stay stateless** — deploy any number of agent instances freely; they all share the same memory pool via mnemo-server
 - **Switch machines freely** — your agent's memory follows you, not your laptop
@@ -121,12 +130,13 @@ Agent identity: `X-Mnemo-Agent-Id` header.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `MNEMO_DSN` | Yes | — | Database connection string |
+| `MNEMO_DSN` | Yes | — | Database connection string (PostgreSQL format for db9) |
+| `MNEMO_DB_TYPE` | No | `tidb` | Database type: `db9` or `tidb` |
 | `MNEMO_PORT` | No | `8080` | HTTP listen port |
 | `MNEMO_RATE_LIMIT` | No | `100` | Requests/sec per IP |
 | `MNEMO_RATE_BURST` | No | `200` | Burst size |
 | `MNEMO_EMBED_API_KEY` | No | — | Embedding provider API key |
-| `MNEMO_EMBED_BASE_URL` | No | OpenAI | Custom embedding endpoint |
+| `MNEMO_EMBED_BASE_URL` | No | OpenAI | Custom embedding endpoint (e.g., Ollama) |
 | `MNEMO_EMBED_MODEL` | No | `text-embedding-3-small` | Model name |
 | `MNEMO_EMBED_DIMS` | No | `1536` | Vector dimensions |
 
@@ -135,14 +145,24 @@ Agent identity: `X-Mnemo-Agent-Id` header.
 ```bash
 cd server
 go build -o mnemo-server ./cmd/mnemo-server
-MNEMO_DSN="user:pass@tcp(host:4000)/mnemos?parseTime=true" ./mnemo-server
+
+# With db9
+export MNEMO_DSN="postgresql://user:pass@pg.db9.io:5433/postgres"
+export MNEMO_DB_TYPE="db9"
+./mnemo-server
+
+# With local Ollama for embeddings
+export MNEMO_EMBED_BASE_URL="http://localhost:11434/v1"
+export MNEMO_EMBED_MODEL="nomic-embed-text"
+export MNEMO_EMBED_DIMS="768"
+./mnemo-server
 ```
 
 ### Docker
 
 ```bash
 docker build -t mnemo-server ./server
-docker run -e MNEMO_DSN="..." -p 8080:8080 mnemo-server
+docker run -e MNEMO_DSN="postgresql://..." -e MNEMO_DB_TYPE="db9" -p 8080:8080 mnemo-server
 ```
 
 ## Project Structure
@@ -157,7 +177,9 @@ mnemos/
 │   │   ├── embed/              # Embedding provider (OpenAI/Ollama/any)
 │   │   ├── handler/            # HTTP handlers + chi router
 │   │   ├── middleware/         # Auth + rate limiter
-│   │   ├── repository/         # Interface + TiDB SQL implementation
+│   │   ├── repository/         # Interface + db9/TiDB implementations
+│   │   │   ├── db9/            # PostgreSQL (db9) backend
+│   │   │   └── tidb/           # TiDB/MySQL backend
 │   │   └── service/            # Business logic (upsert, LWW, hybrid search)
 │   ├── schema.sql
 │   └── Dockerfile
@@ -184,10 +206,9 @@ mnemos/
 | Phase | What | Status |
 |-------|------|--------|
 | **Phase 1** | Core server + CRUD + auth + hybrid search + upsert + plugins | ✅ Done |
+| **Phase 2** | db9 backend support | ✅ Done |
 | **Phase 3** | LLM-assisted conflict merge, auto-tagging | 🔜 Planned |
 | **Phase 4** | Web dashboard, bulk import/export, CLI wizard | 📋 Planned |
-
-Vector Clock CRDT was deferred and removed from the roadmap.
 
 ## Contributing
 
@@ -200,7 +221,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 ---
 
 <p align="center">
-  <a href="https://tidbcloud.com"><img src="assets/tidb-logo.png" alt="TiDB Starter" height="36" /></a>
+  <a href="https://db9.ai"><img src="https://db9.ai/logo.svg" alt="db9" height="36" /></a>
   <br/>
-  <sub>Built with <a href="https://tidbcloud.com">TiDB Starter</a> — zero-ops database with native vector search.</sub>
+  <sub>Built with <a href="https://db9.ai">db9</a> — PostgreSQL with native vector search and Chinese FTS.</sub>
 </p>
