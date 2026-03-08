@@ -22,15 +22,15 @@
 
 ### Option A: Hosted (Recommended)
 
-Use the hosted service at `https://mem.db9.ai` — no server setup required.
+Use the hosted service at `https://mem-api.db9.ai` — no server setup required.
 
 ```bash
 # 1. Provision a tenant
-curl -s -X POST https://mem.db9.ai/v1alpha1/mem9s
+curl -s -X POST https://mem-api.db9.ai/v1alpha1/mem9s
 # → {"id":"...", "claim_url":"..."}
 
 # 2. Configure your agent
-export MNEMO_API_URL="https://mem.db9.ai"
+export MNEMO_API_URL="https://mem-api.db9.ai"
 export MNEMO_TENANT_ID="..."
 ```
 
