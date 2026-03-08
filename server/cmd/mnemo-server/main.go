@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/qiffang/mnemos/server/internal/handler"
 	"github.com/qiffang/mnemos/server/internal/llm"
 	"github.com/qiffang/mnemos/server/internal/middleware"
+	"github.com/qiffang/mnemos/server/internal/repository"
+	"github.com/qiffang/mnemos/server/internal/repository/db9"
 	"github.com/qiffang/mnemos/server/internal/repository/tidb"
 	"github.com/qiffang/mnemos/server/internal/service"
 	"github.com/qiffang/mnemos/server/internal/tenant"
@@ -28,12 +31,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := tidb.NewDB(cfg.DSN)
-	if err != nil {
-		logger.Error("failed to connect database", "err", err)
-		os.Exit(1)
+	var sqlDB *sql.DB
+	var tenantRepo repository.TenantRepo
+
+	if cfg.DBType == "db9" {
+		sqlDB, err = db9.NewDB(cfg.DSN)
+		if err != nil {
+			logger.Error("failed to connect db9 database", "err", err)
+			os.Exit(1)
+		}
+		// Initialize schema for db9
+		if err := db9.InitSchema(sqlDB); err != nil {
+			logger.Error("failed to initialize db9 schema", "err", err)
+			os.Exit(1)
+		}
+		tenantRepo = db9.NewTenantRepo(sqlDB)
+		logger.Info("connected to db9", "dsn_prefix", cfg.DSN[:min(50, len(cfg.DSN))]+"...")
+	} else {
+		sqlDB, err = tidb.NewDB(cfg.DSN)
+		if err != nil {
+			logger.Error("failed to connect tidb database", "err", err)
+			os.Exit(1)
+		}
+		tenantRepo = tidb.NewTenantRepo(sqlDB)
+		logger.Info("connected to tidb")
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
 	// Embedder (nil if not configured → keyword-only search).
 	embedder := embed.New(embed.Config{
@@ -62,8 +85,7 @@ func main() {
 		logger.Info("no LLM configured, ingest will use raw mode")
 	}
 
-	// Repositories.
-	tenantRepo := tidb.NewTenantRepo(db)
+	// Tenant pool.
 	tenantPool := tenant.NewPool(tenant.PoolConfig{
 		MaxIdle:     cfg.TenantPoolMaxIdle,
 		MaxOpen:     cfg.TenantPoolMaxOpen,
@@ -74,7 +96,7 @@ func main() {
 
 	// Services.
 	var zeroClient *tenant.ZeroClient
-	if cfg.TiDBZeroEnabled {
+	if cfg.TiDBZeroEnabled && cfg.DBType != "db9" {
 		zeroClient = tenant.NewZeroClient(cfg.TiDBZeroAPIURL)
 	}
 	tenantSvc := service.NewTenantService(tenantRepo, zeroClient, tenantPool, logger)
@@ -86,7 +108,7 @@ func main() {
 	rateMW := rl.Middleware()
 
 	// Handler.
-	srv := handler.NewServer(tenantSvc, embedder, llmClient, cfg.EmbedAutoModel, service.IngestMode(cfg.IngestMode), logger)
+	srv := handler.NewServer(tenantSvc, embedder, llmClient, cfg.EmbedAutoModel, service.IngestMode(cfg.IngestMode), cfg.DBType, logger)
 	router := srv.Router(tenantMW, rateMW)
 
 	httpSrv := &http.Server{
@@ -111,7 +133,7 @@ func main() {
 		}
 	}()
 
-	logger.Info("starting mnemo server", "port", cfg.Port)
+	logger.Info("starting mnemo server", "port", cfg.Port, "db_type", cfg.DBType)
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server error", "err", err)
 		os.Exit(1)

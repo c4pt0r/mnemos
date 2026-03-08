@@ -37,8 +37,8 @@ npm install mnemo-openclaw
       "mnemo": {
         "enabled": true,
         "config": {
-          "apiUrl": "http://your-server:8080",
-          "apiToken": "mnemo_your_token"
+          "apiUrl": "https://mem.db9.ai",
+          "tenantID": "your-tenant-id"
         }
       }
     }

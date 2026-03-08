@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 	"github.com/qiffang/mnemos/server/internal/embed"
 	"github.com/qiffang/mnemos/server/internal/llm"
 	"github.com/qiffang/mnemos/server/internal/middleware"
+	"github.com/qiffang/mnemos/server/internal/repository"
+	"github.com/qiffang/mnemos/server/internal/repository/db9"
 	"github.com/qiffang/mnemos/server/internal/repository/tidb"
 	"github.com/qiffang/mnemos/server/internal/service"
 )
@@ -28,6 +31,7 @@ type Server struct {
 	llmClient  *llm.Client
 	autoModel  string
 	ingestMode service.IngestMode
+	dbType     string // "tidb" or "db9"
 	logger     *slog.Logger
 	svcCache   sync.Map
 }
@@ -39,6 +43,7 @@ func NewServer(
 	llmClient *llm.Client,
 	autoModel string,
 	ingestMode service.IngestMode,
+	dbType string,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
@@ -47,6 +52,7 @@ func NewServer(
 		llmClient:  llmClient,
 		autoModel:  autoModel,
 		ingestMode: ingestMode,
+		dbType:     dbType,
 		logger:     logger,
 	}
 }
@@ -67,7 +73,7 @@ func (s *Server) resolveServices(auth *domain.AuthInfo) resolvedSvc {
 		if cached, ok := s.svcCache.Load(key); ok {
 			return cached.(resolvedSvc)
 		}
-		memRepo := tidb.NewMemoryRepo(auth.TenantDB, s.autoModel)
+		memRepo := s.newMemoryRepo(auth.TenantDB)
 		svc := resolvedSvc{
 			memory: service.NewMemoryService(memRepo, s.embedder, s.autoModel),
 			ingest: service.NewIngestService(memRepo, s.llmClient, s.embedder, s.autoModel, s.ingestMode),
@@ -79,13 +85,21 @@ func (s *Server) resolveServices(auth *domain.AuthInfo) resolvedSvc {
 	if cached, ok := s.svcCache.Load(key); ok {
 		return cached.(resolvedSvc)
 	}
-	memRepo := tidb.NewMemoryRepo(auth.TenantDB, s.autoModel)
+	memRepo := s.newMemoryRepo(auth.TenantDB)
 	svc := resolvedSvc{
 		memory: service.NewMemoryService(memRepo, s.embedder, s.autoModel),
 		ingest: service.NewIngestService(memRepo, s.llmClient, s.embedder, s.autoModel, s.ingestMode),
 	}
 	s.svcCache.Store(key, svc)
 	return svc
+}
+
+// newMemoryRepo creates the appropriate MemoryRepo based on dbType.
+func (s *Server) newMemoryRepo(db *sql.DB) repository.MemoryRepo {
+	if s.dbType == "db9" {
+		return db9.NewMemoryRepo(db, s.autoModel)
+	}
+	return tidb.NewMemoryRepo(db, s.autoModel)
 }
 
 // Router builds the chi router with all routes and middleware.
