@@ -93,6 +93,10 @@ func (r *MemoryRepo) UpdateOptimistic(ctx context.Context, m *domain.Memory, exp
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
+		if expectedVersion > 0 {
+			// Version mismatch - return conflict error
+			return domain.ErrWriteConflict
+		}
 		return domain.ErrNotFound
 	}
 	return nil

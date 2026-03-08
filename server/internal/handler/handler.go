@@ -163,7 +163,7 @@ func (s *Server) handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrNotFound):
 		respondError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrWriteConflict):
-		respondError(w, http.StatusServiceUnavailable, err.Error())
+		respondError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrConflict):
 		respondError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrDuplicateKey):
